@@ -1,0 +1,205 @@
+# ============================================================
+# PROJECT: Multi-Tenant Hospital SaaS Platform
+# STACK: Next.js (App Router), Node.js, TypeScript, PostgreSQL
+# SCOPE: Super Admin Web, Backend API, Shared Auth & Tenancy
+# ROLE: Cursor acts as a Senior SaaS Architect & Backend Engineer
+# ============================================================
+
+## CORE ARCHITECTURE PRINCIPLE (VERY IMPORTANT)
+- This project uses **Next.js as a full-stack framework**.
+- Backend APIs and Super Admin frontend live in the SAME codebase.
+- They MUST be logically and structurally separated.
+- Backend APIs must remain framework-agnostic and reusable by:
+  - Web Admin
+  - Doctor mobile app
+  - Patient mobile app
+
+---
+
+## NEXT.JS RESPONSIBILITIES
+Next.js is used for:
+1. Super Admin web interface
+2. REST API backend
+3. Authentication & middleware
+4. Server-side security & tenancy enforcement
+
+Do NOT mix UI logic with backend logic.
+
+---
+
+## REQUIRED PROJECT STRUCTURE
+
+src/
+├── app/
+│ ├── api/ # BACKEND (REST APIs)
+│ │ └── v1/
+│ │ ├── auth/
+│ │ ├── hospitals/
+│ │ ├── branches/
+│ │ ├── users/
+│ │ ├── doctors/
+│ │ ├── patients/
+│ │ └── appointments/
+│ │
+│ ├── (super-admin)/ # SUPER ADMIN FRONTEND
+│ │ ├── dashboard/
+│ │ ├── branches/
+│ │ ├── managers/
+│ │ ├── doctors/
+│ │ └── settings/
+│ │
+│ └── layout.tsx
+│
+├── modules/ # BUSINESS LOGIC (SERVER ONLY)
+│ ├── auth/
+│ ├── hospitals/
+│ ├── branches/
+│ ├── users/
+│ └── appointments/
+│
+├── lib/
+│ ├── db.ts # Prisma / DB connection
+│ ├── auth.ts # JWT helpers
+│ ├── rbac.ts # Role permissions
+│ └── tenancy.ts # hospital_id enforcement
+│
+└── middleware.ts # Auth + Tenancy guard
+
+yaml
+Copy code
+
+---
+
+## API DEVELOPMENT RULES (CRITICAL)
+- All APIs must live under `/app/api/v1/*`
+- APIs must:
+  - Validate authentication
+  - Enforce `hospital_id` scoping
+  - Enforce RBAC
+- APIs must NOT:
+  - Import UI components
+  - Depend on browser APIs
+  - Assume a web-only client
+
+Example:
+POST /api/v1/auth/super-admin/signup
+POST /api/v1/auth/verify-email
+GET /api/v1/branches
+
+yaml
+Copy code
+
+---
+
+## FRONTEND (SUPER ADMIN) RULES
+- Frontend pages live under `(super-admin)`
+- UI must consume backend APIs via HTTP
+- Do NOT access database directly from pages
+- Role-based UI rendering is REQUIRED
+- Assume APIs may later move to a separate service
+
+---
+
+## MULTI-TENANCY RULES (NON-NEGOTIABLE)
+- Every database query MUST include `hospital_id`
+- Tenant context comes from authenticated token
+- Super Admin:
+  - Can see all branches
+  - Does NOT see itself as a branch
+- Branch Manager:
+  - Can only see assigned branch
+- SYSTEM_ADMIN:
+  - Can see all hospitals (platform-level)
+
+No cross-hospital data access is allowed.
+
+---
+
+## SUPER ADMIN CREATION FLOW (MANDATORY)
+- Super Admin is created via API
+- Email verification is REQUIRED before activation
+- Flow:
+  1. Signup → status = PENDING
+  2. Email token sent
+  3. Token verified
+  4. Account activated
+
+Required fields:
+- hospital_name
+- admin_name
+- admin_email (global unique)
+- password (hashed)
+- hospital_type (single | multi)
+
+---
+
+## BRANCH RULES
+- Every hospital MUST have at least one branch
+- Single hospitals still create exactly one branch
+- Branch fields:
+  - branch_name
+  - hospital_id
+  - address
+  - phone
+  - email
+  - is_head_branch
+
+---
+
+## AUTHENTICATION & SECURITY
+- JWT access tokens (short-lived)
+- Refresh tokens (secure storage)
+- Web: HTTP-only cookies
+- Mobile: Authorization header
+- Password hashing: bcrypt
+- Rate limit auth endpoints
+- Enforce HTTPS assumptions
+
+---
+
+## DATABASE RULES
+- PostgreSQL only
+- UUID primary keys
+- Indexed:
+  - hospital_id
+  - branch_id
+- Soft deletes where applicable
+- Audit fields:
+  - created_at
+  - updated_at
+  - created_by
+
+---
+
+## ERROR HANDLING & LOGGING
+- Centralized error handling
+- No raw stack traces in production
+- Structured logging with tenant context
+- Clear API error responses
+
+---
+
+## WHAT CURSOR MUST NEVER DO
+- Do NOT mix UI and business logic
+- Do NOT bypass RBAC
+- Do NOT create tenant-unscoped queries
+- Do NOT assume single-hospital logic
+- Do NOT expose PII in logs
+
+---
+
+## FUTURE-PROOFING
+- Design for:
+  - AI medical assistants
+  - Insurance integrations
+  - Pharmacy & lab modules
+  - Multi-language support
+- APIs must remain stable and versioned
+
+---
+
+## EXPECTED OUTPUT
+- Enterprise-grade SaaS code
+- Secure, scalable, multi-tenant
+- Mobile-ready backend
+- Clean separation of concerns

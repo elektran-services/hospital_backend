@@ -1,0 +1,315 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Hospital {
+  id           String        @id @default(uuid())
+  name         String
+  logo         String?
+  createdBy    String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+  appointments Appointment[]
+  branches     Branch[]
+  users        User[]
+}
+
+model Branch {
+  id           String        @id @default(uuid())
+  hospitalId   String
+  name         String
+  address      String
+  city         String?
+  state        String?
+  country      String?
+  phone        String
+  email        String
+  isHeadBranch Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+  appointments Appointment[]
+  hospital     Hospital      @relation(fields: [hospitalId], references: [id])
+  users        User[]
+
+  @@index([hospitalId])
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  hospitalId          String
+  branchId            String?
+  role                UserRole
+  status              UserStatus           @default(PENDING)
+  fullName            String
+  email               String               @unique
+  passwordHash        String
+  emailVerifiedAt     DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+  doctorAppointments  Appointment[]        @relation("DoctorAppointments")
+  patientAppointments Appointment[]        @relation("PatientAppointments")
+  doctorAvailability  DoctorAvailability[] @relation("DoctorAvailability")
+  doctorProfile       DoctorProfile?
+  patientProfile      PatientProfile?
+  refreshTokens       RefreshToken[]
+  deviceTokens        DeviceToken[]
+  branch              Branch?              @relation(fields: [branchId], references: [id])
+  hospital            Hospital             @relation(fields: [hospitalId], references: [id])
+  verificationTokens  VerificationToken[]
+
+  @@index([hospitalId])
+  @@index([branchId])
+}
+
+model DoctorProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  specialty String?
+  license   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model DoctorAvailability {
+  id        String    @id @default(uuid())
+  doctorId  String
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime   String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  doctor    User      @relation("DoctorAvailability", fields: [doctorId], references: [id])
+
+  @@unique([doctorId, dayOfWeek])
+  @@index([doctorId])
+}
+
+model PatientProfile {
+  id                           String         @id @default(uuid())
+  userId                       String         @unique
+  dateOfBirth                  DateTime?
+  createdAt                    DateTime       @default(now())
+  updatedAt                    DateTime       @updatedAt
+  address                      String?
+  bloodGroup                   BloodGroup?
+  city                         String?
+  disabilities                 String?
+  emergencyContactName         String?
+  emergencyContactPhone        String?
+  emergencyContactRelationship String?
+  existingConditions           String?
+  gender                       Gender?
+  genotype                     Genotype?
+  knownAllergies               String?
+  maritalStatus                MaritalStatus?
+  nationality                  String?
+  stateOfResidence             String?
+  user                         User           @relation(fields: [userId], references: [id])
+}
+
+model VerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model OtpToken {
+  id        String    @id @default(uuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@index([otp])
+}
+
+model Appointment {
+  id                  String            @id @default(uuid())
+  hospitalId          String
+  branchId            String
+  doctorId            String
+  patientId           String
+  status              AppointmentStatus @default(requested)
+  appointmentType     AppointmentType
+  scheduledAt         DateTime
+  createdBy           String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  cancelledAt         DateTime?
+  note                String?
+  cancelReason        String?
+  videoCallStartedAt  DateTime?
+  videoCallEndedAt    DateTime?
+  videoCallIsActive   Boolean           @default(false)
+  videoCallDuration   Int?
+  callSession         CallSession?
+  branch              Branch            @relation(fields: [branchId], references: [id])
+  doctor              User              @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  hospital            Hospital          @relation(fields: [hospitalId], references: [id])
+  patient             User              @relation("PatientAppointments", fields: [patientId], references: [id])
+
+  @@index([hospitalId])
+  @@index([branchId])
+  @@index([doctorId])
+  @@index([patientId])
+}
+
+model DeviceToken {
+  id            String    @id @default(uuid())
+  userId        String
+  fcmToken      String
+  deviceType    String?   @default("unknown")
+  lastUsedAt    DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([fcmToken])
+}
+
+model CallSession {
+  id                    String            @id @default(uuid())
+  appointmentId         String            @unique
+  hospitalId            String
+  branchId              String
+  callerId              String
+  callerName            String
+  receiverId            String
+  channelId             String
+  agoraCallerToken      String
+  agoraReceiverToken    String
+  sessionStatus         CallSessionStatus @default(CONNECTING)
+  notificationSentAt    DateTime?
+  callStartedAt         DateTime?
+  callEndedAt           DateTime?
+  callDuration          Int?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  appointment           Appointment       @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentId])
+  @@index([hospitalId])
+  @@index([channelId])
+  @@index([callerId])
+  @@index([receiverId])
+}
+
+model AgoraConfig {
+  id        String    @id @default(uuid())
+  appId     String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("agora_config")
+}
+
+enum UserRole {
+  SYSTEM_ADMIN
+  SUPER_ADMIN
+  BRANCH_MANAGER
+  DOCTOR
+  PATIENT
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum AppointmentStatus {
+  requested
+  confirmed
+  in_progress
+  completed
+  cancelled
+}
+
+enum AppointmentType {
+  virtual
+  physical
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+  OTHER
+}
+
+enum BloodGroup {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+}
+
+enum Genotype {
+  AA
+  AS
+  AC
+  SS
+  SC
+  CC
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum CallSessionStatus {
+  CONNECTING
+  ACTIVE
+  COMPLETED
+  FAILED
+  CANCELLED
+}
